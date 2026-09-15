@@ -138,21 +138,32 @@ elif page == "Verify pair":
         st.markdown(f'<div class="result"><div class="result-label">RESULT / PAIR ANALYSIS</div><div class="result-value">{"MATCH" if same else "NO MATCH"} · {score:.0%}</div><span class="small-note">Threshold: {st.session_state.threshold:.2f}</span></div>', unsafe_allow_html=True)
 
 elif page == "Known gallery":
-    st.markdown('<span class="eyebrow">ENROLLED SUBJECTS / LOCAL INDEX</span>', unsafe_allow_html=True)
-    st.header("Known gallery")
-    st.write("Manage the consented subjects used by the supervised classifier.")
-    for person in st.session_state.people:
-        st.markdown(f'<div class="person"><b>{person["initials"]} · {person["name"]}</b><span>{person["samples"]} samples · {person.get("status", "verified")}</span></div>', unsafe_allow_html=True)
-    st.subheader("Add subject")
-    with st.form("enroll_subject"):
-        name = st.text_input("Subject name")
-        image = st.file_uploader("Reference image", type=["jpg", "jpeg", "png"], key="enroll")
-        submitted = st.form_submit_button("＋ Enroll subject")
-        if submitted and name and image:
-            save_upload(image, "gallery")
-            initials = "".join(part[0] for part in name.split()[:2]).upper()
-            st.session_state.people.append({"name": name, "initials": initials, "samples": 1, "color": "#64D2FF", "status": "new"})
-            st.success(f"{name} enrolled in the local gallery.")
+    st.subheader("Enrolled subjects")
+    for index, person in enumerate(list(st.session_state.people)):
+        with st.expander(f"{person['initials']} · {person['name']}  |  {person['samples']} samples"):
+            edit_name = st.text_input("Subject name", value=person["name"], key=f"edit-name-{index}")
+            replacement = st.file_uploader("Replace reference image (optional)", type=["jpg", "jpeg", "png"], key=f"replace-image-{index}")
+            edit_col, delete_col = st.columns(2)
+            with edit_col:
+                if st.button("Save changes", key=f"save-person-{index}", use_container_width=True):
+                    clean_name = edit_name.strip()
+                    if not clean_name:
+                        st.warning("Subject name cannot be empty.")
+                    else:
+                        person["name"] = clean_name
+                        person["initials"] = "".join(part[0] for part in clean_name.split()[:2]).upper()
+                        if replacement:
+                            save_upload(replacement, f"gallery-replacement-{index}")
+                            person["samples"] = max(person["samples"], 1)
+                        st.session_state.people[index] = person
+                        st.success(f"{clean_name} updated.")
+                        st.rerun()
+            with delete_col:
+                confirm_delete = st.checkbox("Confirm deletion", key=f"confirm-delete-{index}")
+                if st.button("Delete subject", key=f"delete-person-{index}", use_container_width=True, disabled=not confirm_delete):
+                    removed = st.session_state.people.pop(index)
+                    st.success(f"{removed['name']} removed from the gallery.")
+                    st.rerun()
         elif submitted:
             st.warning("Add a subject name and reference image first.")
 
